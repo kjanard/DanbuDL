@@ -16,6 +16,12 @@
 ---
 </div>
 
+<div align="center">
+  <img src="assets/screenshot_initial.png" alt="DanbuDL Desktop GUI Interface Screenshot" style="border-radius: 12px; width: 100%; max-width: 950px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);">
+</div>
+
+<br/>
+
 > [!NOTE]
 > **🛡️ ได้รับการออกแบบตามมาตรฐานทางการของ Danbooru API (Official Compliance)**:  
 > โปรแกรมนี้ได้รับการพัฒนาและออกแบบอย่างเคร่งครัดตามข้อกำหนดและแนวทางปฏิบัติทางการของ Danbooru จาก [Help:API](https://danbooru.donmai.us/wiki_pages/help:api) และ [Help:User Scripts](https://danbooru.donmai.us/wiki_pages/help:user_scripts) เพื่อให้มั่นใจในความปลอดภัยต่อบัญชีผู้ใช้ หลีกเลี่ยงการถูกแบน IP และลดภาระการทำงานของเซิร์ฟเวอร์ Danbooru
@@ -181,7 +187,8 @@ python -m unittest discover -s tests -p "test_*.py" -v
 ```
 DanbuDownloader/
 ├── assets/
-│   └── check.svg        # ไอคอน Vector Checkmark สำหรับ UI Checkbox
+│   ├── check.svg              # ไอคอน Vector Checkmark สำหรับ UI Checkbox
+│   └── screenshot_initial.png # ภาพตัวอย่างหน้าจอโปรแกรมเริ่มต้น (Desktop UI)
 ├── icon/
 │   ├── logo.jpg         # ไอคอนโลโก้ของโปรแกรม DanbuDL
 │   └── logo2.jpg        # ภาพอาร์ตเวิร์กโลโก้ความละเอียดสูง
