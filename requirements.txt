@@ -1,0 +1,12 @@
+# ========================================================
+# DanbuDL: Danbooru Downloader - Dependencies & Requirements
+# ========================================================
+
+# --- GUI & Desktop Framework ---
+PyQt6>=6.6.0
+
+# --- Networking & HTTP API Client ---
+requests>=2.31.0
+
+# --- Image Processing & Format Utilities ---
+pillow>=10.0.0

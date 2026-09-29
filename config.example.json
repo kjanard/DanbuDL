@@ -1,0 +1,20 @@
+{
+    "download_dir": "downloads",
+    "request_delay": 1.0,
+    "max_concurrent": 2,
+    "save_metadata": true,
+    "metadata_format": "txt",
+    "skip_existing": true,
+    "download_quality": "original",
+    "api_username": "",
+    "api_key": "",
+    "default_ratings": {
+        "all": false,
+        "g": true,
+        "s": true,
+        "q": false,
+        "e": false
+    },
+    "default_limit": 50,
+    "file_naming": "{id}_{md5}.{ext}"
+}

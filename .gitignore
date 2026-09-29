@@ -1,0 +1,72 @@
+# ========================================================
+# DanbuDL: Danbooru Downloader - Git Ignore Rules
+# ========================================================
+
+# --- Python Byte-compiled / Optimized Files ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+*.so
+
+# --- Python Virtual Environments ---
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- Local Configurations & Sensitive Credentials ---
+# (config.json contains personal local directory paths & Danbooru API key)
+config.json
+*.bak
+
+# --- Downloaded Images, Artworks & Temp Media ---
+downloads/
+temp/
+tmp/
+*.tmp
+*.download
+*.part
+*.crdownload
+
+# --- Application Logs & Debug Output ---
+*.log
+error.log
+
+# --- Unit Testing & Coverage Artifacts ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+
+# --- Operating System Files ---
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+$RECYCLE.BIN/
+*.lnk
+
+# --- IDE & Editor Settings ---
+.vscode/
+.idea/
+.vs/
+.agents/
+.cursor/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.code-workspace
+
+# --- Distribution & PyInstaller Packaging ---
+build/
+dist/
+*.spec
+*.exe
+*.dll
+*.egg-info/
+*.egg
