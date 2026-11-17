@@ -6,8 +6,8 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QScrollArea, QFrame, QApplication
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QObject, QThread
-from PyQt6.QtGui import QPixmap, QImage
+from PyQt6.QtCore import Qt, pyqtSignal, QObject, QThread, QUrl, pyqtSlot
+from PyQt6.QtGui import QPixmap, QImage, QDesktopServices
 from ui.widgets import RatingBadge, CATEGORY_COLORS
 
 
@@ -19,6 +19,7 @@ class PreviewLoader(QObject):
         super().__init__()
         self.api = api
 
+    @pyqtSlot(int, str)
     def fetch(self, post_id: int, url: str):
         if not url:
             return
@@ -29,6 +30,8 @@ class PreviewLoader(QObject):
 
 class PreviewPanel(QWidget):
     """Side panel displaying post preview image, metadata, tags, and action buttons."""
+    request_preview = pyqtSignal(int, str)
+
     def __init__(self, api, parent=None):
         super().__init__(parent)
         self.api = api
@@ -40,6 +43,7 @@ class PreviewPanel(QWidget):
         self.thread = QThread()
         self.loader = PreviewLoader(self.api)
         self.loader.moveToThread(self.thread)
+        self.request_preview.connect(self.loader.fetch)
         self.loader.loaded.connect(self._on_image_loaded)
         self.thread.start()
 
@@ -202,13 +206,36 @@ class PreviewPanel(QWidget):
             self.btn_open_file.setEnabled(False)
 
         # Load image preview
+        self.current_pixmap = None
+        self.image_lbl.clear()
+        if local_path and Path(local_path).exists():
+            self.set_local_path(local_path)
+            return
+
         self.image_lbl.setText("Loading preview...")
         # Prefer preview_file_url for speed, or large_file_url
         img_url = post.get("preview_file_url") or post.get("large_file_url")
         if img_url:
-            self.loader.fetch(post_id, img_url)
+            self.request_preview.emit(post_id, img_url)
         else:
             self.image_lbl.setText("No preview available")
+
+    def _update_pixmap_display(self):
+        if not self.current_pixmap or self.current_pixmap.isNull():
+            return
+        target_w = max(100, self.image_container.width() - 12)
+        target_h = max(240, self.height() // 3)
+        scaled = self.current_pixmap.scaled(
+            target_w,
+            target_h,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+        self.image_lbl.setPixmap(scaled)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_pixmap_display()
 
     def _on_image_loaded(self, post_id: int, image_bytes: bytes):
         if not self.current_post or self.current_post.get("id") != post_id:
@@ -218,13 +245,7 @@ class PreviewPanel(QWidget):
         pix.loadFromData(image_bytes)
         if not pix.isNull():
             self.current_pixmap = pix
-            scaled = pix.scaled(
-                self.image_container.width() - 8,
-                240,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
-            self.image_lbl.setPixmap(scaled)
+            self._update_pixmap_display()
         else:
             self.image_lbl.setText("Failed to decode image")
 
@@ -236,13 +257,7 @@ class PreviewPanel(QWidget):
             pix = QPixmap(path)
             if not pix.isNull():
                 self.current_pixmap = pix
-                scaled = pix.scaled(
-                    self.image_container.width() - 8,
-                    240,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
-                )
-                self.image_lbl.setPixmap(scaled)
+                self._update_pixmap_display()
 
     def _open_in_danbooru(self):
         if self.current_post:
@@ -259,4 +274,4 @@ class PreviewPanel(QWidget):
 
     def _open_local_file(self):
         if self.downloaded_filepath and os.path.exists(self.downloaded_filepath):
-            os.startfile(self.downloaded_filepath)
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(self.downloaded_filepath).resolve())))

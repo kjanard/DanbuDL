@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.1] - 2026-11-17
+
+### Added
+- **Search Cancellation (`⏹️ Stop Search`)**: Enabled interrupting ongoing post searches directly from the search button and cleanly cancelling fetch workers on window close.
+- **Queue Context Menu Actions**: Added `🏷️ Copy Tags` alongside `🌐 Open in Danbooru`, `📋 Copy Post ID`, and `📁 Open Downloaded File` in the Posts Queue right-click menu.
+- **Window & App Icon + Responsive Preview Scaling**: Applied `icon/logo.jpg` to both the application and main window, and added `resizeEvent` scaling in `PreviewPanel` so preview images adapt dynamically when resizing the window or splitter.
+- **Thread-Safe HTTP Pooling & Cache Locking**: Mounted `HTTPAdapter(pool_connections=10, pool_maxsize=10)` on `DanbooruAPI.session` and added `_cache_lock` (`threading.Lock`) around autocomplete cache reads and writes.
+
+### Fixed
+- **True Background Worker Threading**: Switched `PreviewLoader` and `AutocompleteWorker` invocations to `pyqtSignal`/`@pyqtSlot` queued connections so network image loading and autocomplete queries run strictly on their worker threads instead of blocking the main GUI thread.
+- **UI Test Config Isolation**: Injected a temporary `ConfigManager` in `tests/test_ui.py` so running unit tests never overwrites the user's `config.json` (`default_ratings`), and guarded `test_integration.py` against offline `requests.RequestException` failures.
+- **Right-Click Context Menu Behavior**: Fixed `Copy Post ID` mistakenly copying tags and ensured all context menu actions operate on the clicked row's post rather than the preview panel's selection.
+- **Cross-Platform File & Folder Opening**: Replaced Windows-only `os.startfile(...)` calls with `QDesktopServices.openUrl(QUrl.fromLocalFile(...))` across `MainWindow` and `PreviewPanel`.
+- **Pagination, Ordering & Rating Filter Consistency**:
+  - Preserved natural page ordering for `pool:<id>` searches and custom `order:` tags instead of applying `b<id>` cursor pagination incorrectly.
+  - Omitted redundant `order:id_desc` from default searches to avoid consuming an extra Danbooru tag slot.
+  - Applied selected Rating filters when fetching a direct post URL.
+- **Config Persistence & Filename Safety**: Connected `default_limit`, `file_naming`, and download options cleanly to `_load_settings()`/`_save_settings()`, and added a safe fallback when `file_naming` contains invalid placeholders.
+- **AI/LoRA `.txt` Metadata Formatting**: Formatted `.txt` sidecar tag files as comma-separated tags (`tag1, tag2, tag3`) to match `README.md` documentation.
+- **Cleanup**: Removed unused `pillow` dependency from `requirements.txt` and unused `max_concurrent` key from configs.
+
+---
+
 ## [1.2.0] - 2026-09-29
 
 ### Added

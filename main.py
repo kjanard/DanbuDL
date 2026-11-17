@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon
 from ui.main_window import MainWindow
 
 
@@ -16,6 +17,10 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("DanbuDL: Danbooru Downloader")
     app.setOrganizationName("DanbuDL")
+
+    icon_path = Path(__file__).resolve().parent / "icon" / "logo.jpg"
+    if icon_path.exists():
+        app.setWindowIcon(QIcon(str(icon_path)))
 
     window = MainWindow()
     window.show()

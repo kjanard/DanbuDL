@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QListWidget, QListWidgetItem, QWidget,
     QVBoxLayout, QHBoxLayout, QLabel, QFrame
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint, QObject, QThread
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QPoint, QObject, QThread, pyqtSlot
 from PyQt6.QtGui import QColor, QFont, QKeyEvent
 
 CATEGORY_COLORS = {
@@ -31,6 +31,7 @@ class AutocompleteWorker(QObject):
         super().__init__()
         self.api = api
 
+    @pyqtSlot(str)
     def fetch(self, query: str):
         try:
             results = self.api.get_autocomplete(query, limit=10)
@@ -44,6 +45,8 @@ class TagAutoCompleteLineEdit(QLineEdit):
     Intelligent Tag Input with Danbooru API autocomplete, category color coding,
     and cursor word replacement.
     """
+    request_autocomplete = pyqtSignal(str)
+
     def __init__(self, api, parent=None):
         super().__init__(parent)
         self.api = api
@@ -88,6 +91,7 @@ class TagAutoCompleteLineEdit(QLineEdit):
         self.thread = QThread()
         self.worker = AutocompleteWorker(self.api)
         self.worker.moveToThread(self.thread)
+        self.request_autocomplete.connect(self.worker.fetch)
         self.worker.results_ready.connect(self._display_suggestions)
         self.thread.start()
 
@@ -134,7 +138,7 @@ class TagAutoCompleteLineEdit(QLineEdit):
                 self._display_suggestions(self.current_word, self.cache[query])
                 return
             # Trigger worker in thread
-            QTimer.singleShot(0, lambda: self.worker.fetch(self.current_word))
+            self.request_autocomplete.emit(self.current_word)
 
     def _display_suggestions(self, query: str, suggestions: list):
         if suggestions:

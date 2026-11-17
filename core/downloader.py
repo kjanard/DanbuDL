@@ -52,8 +52,11 @@ class FetchWorker(QObject):
                 self.log.emit("INFO", f"Detected Danbooru Post URL for Post #{post_id}...")
                 post = self.api.get_post_by_id(post_id)
                 if post:
-                    all_posts.append(post)
-                    self.log.emit("SUCCESS", f"Found post #{post_id}.")
+                    if self.ratings and len(self.ratings) < 4 and post.get("rating") not in self.ratings:
+                        self.log.emit("WARNING", f"Post #{post_id} skipped due to rating filter ({post.get('rating')}).")
+                    else:
+                        all_posts.append(post)
+                        self.log.emit("SUCCESS", f"Found post #{post_id}.")
                 else:
                     self.log.emit("WARNING", f"Post #{post_id} not found or restricted.")
                 self.finished.emit(all_posts)
@@ -66,10 +69,15 @@ class FetchWorker(QObject):
                 self.tags = f"pool:{pool_id}"
                 self.log.emit("INFO", f"Converted Danbooru Pool URL to search tag 'pool:{pool_id}'...")
 
+            tag_tokens = self.tags.split()
+            explicit_order = next((t.split(":", 1)[1] for t in tag_tokens if t.startswith("order:") and ":" in t), None)
+            is_pool = any(t.startswith("pool:") for t in tag_tokens)
+            effective_order = explicit_order or (None if is_pool and self.order == "id_desc" else self.order)
+            api_order = None if effective_order in (None, "id_desc") else effective_order
+
             self.log.emit("INFO", f"Searching Danbooru for: '{self.tags}' (Ratings: {', '.join(self.ratings) if self.ratings else 'All'})")
 
             cursor_page: Any = 1
-            batch_size = min(200, self.target_limit)
 
             while len(all_posts) < self.target_limit and not self.is_cancelled:
                 needed = self.target_limit - len(all_posts)
@@ -80,7 +88,7 @@ class FetchWorker(QObject):
                     ratings=self.ratings,
                     limit=current_batch,
                     page=cursor_page,
-                    order=self.order
+                    order=api_order
                 )
 
                 if not posts:
@@ -104,10 +112,10 @@ class FetchWorker(QObject):
                 # Official Danbooru pagination: use 'b<id>' to get posts before the last post ID
                 # This prevents HTTP 410 Gone on deep searches!
                 last_post_id = posts[-1].get("id")
-                if last_post_id and (self.order == "id_desc" or "order:id_desc" in self.tags or not self.order):
+                if last_post_id and effective_order in (None, "id_desc") and not is_pool:
                     cursor_page = f"b{last_post_id}"
                 else:
-                    # For score or non-id ordering, use numeric increment
+                    # For score, pool, or non-id ordering, use numeric increment
                     if isinstance(cursor_page, int):
                         cursor_page += 1
                     else:
@@ -219,12 +227,15 @@ class DownloadWorker(QObject):
             if len(artist) > 50:
                 artist = artist[:50]
 
-            filename = self.naming_format.format(
-                id=post_id,
-                md5=md5,
-                artist=artist,
-                ext=ext
-            )
+            try:
+                filename = self.naming_format.format(
+                    id=post_id,
+                    md5=md5,
+                    artist=artist,
+                    ext=ext
+                )
+            except (KeyError, ValueError, IndexError):
+                filename = f"{post_id}_{md5}.{ext}" if md5 else f"{post_id}.{ext}"
             filename = sanitize_filename(filename)
             dest_path = self.download_dir / filename
 
@@ -317,10 +328,11 @@ class DownloadWorker(QObject):
                 with open(meta_file, "w", encoding="utf-8") as f:
                     json.dump(post, f, indent=2, ensure_ascii=False)
             else:
-                # Text format: space separated tags for AI dataset / SD LoRA training
+                # Text format: comma-separated tags for AI dataset / SD LoRA training
                 meta_file = image_path.with_suffix(".txt")
                 tag_string = post.get("tag_string", "")
+                formatted_tags = ", ".join(tag_string.split())
                 with open(meta_file, "w", encoding="utf-8") as f:
-                    f.write(tag_string)
+                    f.write(formatted_tags)
         except Exception as e:
             self.log.emit("WARNING", f"Failed to save metadata for #{post.get('id')}: {e}")

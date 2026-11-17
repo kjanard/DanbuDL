@@ -10,7 +10,6 @@ logger = logging.getLogger("DanbuDL.Config")
 DEFAULT_CONFIG = {
     "download_dir": str(Path.cwd() / "downloads"),
     "request_delay": 1.0,
-    "max_concurrent": 2,
     "save_metadata": True,
     "metadata_format": "txt",  # "txt" or "json"
     "skip_existing": True,

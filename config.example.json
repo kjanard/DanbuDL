@@ -1,7 +1,6 @@
 {
     "download_dir": "downloads",
     "request_delay": 1.0,
-    "max_concurrent": 2,
     "save_metadata": true,
     "metadata_format": "txt",
     "skip_existing": true,

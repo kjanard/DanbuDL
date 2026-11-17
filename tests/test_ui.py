@@ -1,11 +1,14 @@
 import os
+import tempfile
 import unittest
+from pathlib import Path
 
 # Ensure PyQt runs headlessly in offscreen mode
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
+from core.config import ConfigManager
 from ui.main_window import MainWindow
 from ui.widgets import RatingBadge, TagAutoCompleteLineEdit
 from ui.preview_panel import PreviewPanel
@@ -18,6 +21,13 @@ class TestUIComponents(unittest.TestCase):
         # Create single QApplication instance for all UI tests
         cls.app = QApplication.instance() or QApplication([])
 
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.cfg = ConfigManager(filepath=Path(self.temp_dir.name) / "test_ui_config.json")
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
     def test_rating_badge(self):
         """Test RatingBadge color and text generation."""
         badge_g = RatingBadge("g")
@@ -27,7 +37,7 @@ class TestUIComponents(unittest.TestCase):
 
     def test_main_window_init(self):
         """Test MainWindow window title and initial states."""
-        win = MainWindow()
+        win = MainWindow(config_manager=self.cfg)
         self.assertEqual(win.windowTitle(), "DanbuDL: Danbooru Downloader")
         self.assertIsNotNone(win.table)
         self.assertIsNotNone(win.preview_panel)
@@ -36,7 +46,7 @@ class TestUIComponents(unittest.TestCase):
 
     def test_rating_all_bidirectional_sync(self):
         """Test All rating checkbox synchronization with individual checkboxes."""
-        win = MainWindow()
+        win = MainWindow(config_manager=self.cfg)
 
         # Turn ON All
         win.chk_all.setChecked(True)
@@ -64,7 +74,7 @@ class TestUIComponents(unittest.TestCase):
 
     def test_table_population_and_preview_selection(self):
         """Test populating table with mock posts and updating preview on selection."""
-        win = MainWindow()
+        win = MainWindow(config_manager=self.cfg)
         mock_posts = [
             {
                 "id": 1111,
@@ -107,7 +117,7 @@ class TestUIComponents(unittest.TestCase):
 
     def test_clean_close_event(self):
         """Test that closing MainWindow stops all threads cleanly without crashes."""
-        win = MainWindow()
+        win = MainWindow(config_manager=self.cfg)
         win.show()
         # Trigger closeEvent
         win.close()

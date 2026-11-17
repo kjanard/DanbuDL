@@ -109,7 +109,7 @@ class TestDownloader(unittest.TestCase):
         self.assertEqual(img_file.read_bytes(), b"mock_image_data")
 
         self.assertTrue(txt_file.exists())
-        self.assertEqual(txt_file.read_text(encoding="utf-8"), "tag1 tag2 tag3")
+        self.assertEqual(txt_file.read_text(encoding="utf-8"), "tag1, tag2, tag3")
 
     def test_download_worker_save_json_metadata(self):
         """Test downloading and saving .json sidecar metadata."""

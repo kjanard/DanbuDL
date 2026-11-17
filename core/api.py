@@ -4,6 +4,7 @@ import threading
 import logging
 import requests
 from typing import List, Dict, Any, Optional
+from requests.adapters import HTTPAdapter
 from requests.auth import HTTPBasicAuth
 
 logger = logging.getLogger("DanbuDL.API")
@@ -20,7 +21,7 @@ class DanbooruAPI:
     - Exponential backoff on HTTP 429 (User Throttled) / 5xx
     """
     BASE_URL = "https://danbooru.donmai.us"
-    APP_VERSION = "1.2"
+    APP_VERSION = "1.2.1"
 
     def __init__(self, username: str = "", api_key: str = "", delay: float = 1.0):
         self.username = username.strip()
@@ -28,9 +29,13 @@ class DanbooruAPI:
         self.delay = max(0.5, delay)
         self.last_request_time = 0.0
         self._lock = threading.Lock()
+        self._cache_lock = threading.Lock()
         self._cache: Dict[str, Any] = {}
 
         self.session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=10, pool_maxsize=10)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
         self._update_session_auth_and_headers()
 
     def _update_session_auth_and_headers(self):
@@ -210,8 +215,9 @@ class DanbooruAPI:
             return []
 
         cache_key = f"{clean_query}_{limit}"
-        if cache_key in self._cache:
-            return self._cache[cache_key]
+        with self._cache_lock:
+            if cache_key in self._cache:
+                return self._cache[cache_key]
 
         url = f"{self.BASE_URL}/autocomplete.json"
         params = {
@@ -234,7 +240,8 @@ class DanbooruAPI:
                         "post_count": item.get("post_count", 0),
                         "category": item.get("category", 0)
                     })
-                self._cache[cache_key] = results
+                with self._cache_lock:
+                    self._cache[cache_key] = results
                 return results
         except Exception as e:
             logger.debug(f"Autocomplete Error: {e}")

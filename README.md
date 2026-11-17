@@ -33,7 +33,7 @@
 โปรแกรมนี้ปฏิบัติตามข้อกำหนดและ Best Practices ของระบบ Danbooru อย่างครบถ้วน:
 
 1. **การระบุตัวตนผ่าน User-Agent (Identification Standard)**:
-   - ส่ง Header `User-Agent` ในรูปแบบที่เป็นมาตรฐานเฉพาะตัว เช่น `DanbuDownloader/1.2 (user: <username>)` ไม่ปลอมแปลงเป็น Web Browser ตามกฎระเบียบของ Danbooru
+   - ส่ง Header `User-Agent` ในรูปแบบที่เป็นมาตรฐานเฉพาะตัว เช่น `DanbuDownloader/1.2.1 (user: <username>)` ไม่ปลอมแปลงเป็น Web Browser ตามกฎระเบียบของ Danbooru
 2. **ระบบควบคุมอัตราคำขออย่างสุภาพ (Thread-safe Rate Limiting & Backoff)**:
    - ควบคุมการส่งคำขอให้อยู่ในอัตราที่เหมาะสม (~1 คำขอต่อวินาที) ป้องกันการยิงคำขอถี่เกินไปด้วย `threading.Lock()` ข้ามเธรด
    - กำหนดค่า Safe Minimum Delay ขั้นต่ำไว้ที่ 0.5s เพื่อป้องกันข้อผิดพลาด `HTTP 429 User Throttled`
@@ -67,14 +67,15 @@
    - ระบบ Exponential Backoff อัตโนมัติเมื่อเจอรหัส `429 User Throttled` หรือปัญหาเครือข่าย
    - ล็อคป้องกันการส่งคำขอซ้ำซ้อนขณะกำลังดาวน์โหลดหรือค้นหา (Concurrency Guard)
 5. **Live Image Preview & Metadata Panel**:
-   - พรีวิวรูปภาพและแสดงข้อมูลแบบละเอียด (Post ID, Rating, Artist, Resolution, Size, Score, Tags)
+   - พรีวิวรูปภาพแบบปรับขนาดอัตโนมัติตามหน้าต่างและแสดงข้อมูลแบบละเอียด (Post ID, Rating, Artist, Resolution, Size, Score, Tags)
    - มีปุ่มเปิดดูบนเว็บ Danbooru และคัดลอก Tags ทั้งหมดลงคลิปบอร์ดได้ทันที
-   - ปุ่มเปิดดูไฟล์รูปในเครื่องหลังจากดาวน์โหลดเสร็จ
+   - ปุ่มเปิดดูไฟล์รูปในเครื่องหลังจากดาวน์โหลดเสร็จ (รองรับ Cross-Platform ทั้ง Windows, macOS และ Linux)
 6. **บันทึก Metadata คู่กับรูปภาพ**:
-   - บันทึกไฟล์ `.txt` สำหรับนำไปใช้เทรน AI (LoRA / Stable Diffusion) หรือ `.json` เก็บข้อมูลเต็มรูปแบบ
-7. **จัดการคิวดาวน์โหลดอัจฉริยะ**:
-   - ระบบข้ามไฟล์ที่เคยดาวน์โหลดแล้ว (Skip Existing)
+   - บันทึกไฟล์ `.txt` (คั่นแท็กด้วยเครื่องหมายจุลภาค) สำหรับนำไปใช้เทรน AI (LoRA / Stable Diffusion) หรือ `.json` เก็บข้อมูลเต็มรูปแบบ
+7. **จัดการคิวดาวน์โหลดและค้นหาอัจฉริยะ**:
+   - ปุ่มหยุดการค้นหากลางคัน (**Stop Search**) พร้อมระบบข้ามไฟล์ที่เคยดาวน์โหลดแล้ว (Skip Existing)
    - ปุ่มควบคุมการดาวน์โหลด: **Start**, **Pause / Resume**, **Cancel**
+   - เมนูคลิกขวาในตารางคิว (**Open in Danbooru**, **Copy Post ID**, **Copy Tags**, **Open Downloaded File**)
    - แสดงความคืบหน้า (%) และความเร็วดาวน์โหลดแบบ Real-time
 8. **รองรับ Danbooru Account (Optional)**:
    - สามารถกรอก Username & API Key เพื่อเพิ่มโควตาแท็กและสิทธิการเข้าถึงของบัญชีคุณ
@@ -221,6 +222,7 @@ DanbuDownloader/
 ## 📝 ประวัติการอัปเดต (Changelog) <a id="changelog"></a>
 
 รายละเอียดการอัปเดตในแต่ละเวอร์ชัน สามารถอ่านเพิ่มเติมได้ที่ไฟล์ [CHANGELOG.md](CHANGELOG.md)
+* **v1.2.1**: แก้ไขการทำงานของ `PreviewLoader` และ `AutocompleteWorker` ให้รันบน Background Thread จริงด้วย Signal/Slot, แยก `ConfigManager` ชั่วคราวใน UI Tests เพื่อไม่ให้เขียนทับ `config.json`, เพิ่มปุ่ม **Stop Search**, ปรับปรุงเมนูคลิกขวาในตารางคิว (`Copy Post ID` / `Copy Tags`), รองรับการเปิดไฟล์/โฟลเดอร์แบบ Cross-Platform, แก้ไข Pagination ของ Pool และ Custom `order:`, เชื่อมค่า `default_limit`/`file_naming` กับหน้าต่างหลัก, ปรับการบันทึก `.txt` เป็นคั่นด้วยจุลภาค และตั้งค่าไอคอนแอปพลิเคชัน
 * **v1.2.0**: รีแบรนด์ชื่อแอปเป็น **DanbuDL: Danbooru Downloader**, เพิ่มโลโก้โปรเจกต์อย่างเป็นทางการ (`icon/`), เพิ่มสัญญาอนุญาต Custom NC-SA 1.0, เพิ่มตัวเลือก Rating "All", รองรับ Danbooru Pools/Post URLs, ปรับใช้ Cursor Pagination (`b<id>`), เพิ่มระบบป้องกัน 429 Throttling ด้วย Thread-Safe Rate Limiter และ Autocomplete In-Memory Cache (450ms Debounce), สร้าง Automated Test Suite ครบ 27 รายการ, จัดทำ `.gitignore` และคู่มือติดตั้ง-ใช้งานฉบับสมบูรณ์
 * **v1.1.0**: ปรับปรุงการเชื่อมต่อตามข้อกำหนดทางการของ Danbooru API (User-Agent, HTTP Basic Auth, Exponential Backoff)
 * **v1.0.0**: เปิดตัวโปรแกรม Danbooru Downloader พร้อม UI แบบ Dark Mode, Tag Autocomplete และระบบดาวน์โหลดแบบมัลติเธรด

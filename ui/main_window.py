@@ -1,17 +1,18 @@
 import os
 import time
+import webbrowser
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QLabel, QPushButton, QLineEdit, QSpinBox, QComboBox,
     QCheckBox, QSlider, QTableWidget, QTableWidgetItem,
     QHeaderView, QFileDialog, QProgressBar, QTextEdit,
     QGroupBox, QMessageBox, QMenu, QTabWidget, QFrame
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSlot
-from PyQt6.QtGui import QColor, QFont, QAction, QIcon
+from PyQt6.QtCore import Qt, QThread, pyqtSlot, QUrl
+from PyQt6.QtGui import QColor, QFont, QAction, QIcon, QDesktopServices
 
 from core.api import DanbooruAPI
 from core.config import ConfigManager
@@ -22,13 +23,18 @@ from ui.preview_panel import PreviewPanel
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, config_manager: Optional[ConfigManager] = None):
         super().__init__()
         self.setWindowTitle("DanbuDL: Danbooru Downloader")
         self.resize(1280, 840)
         self.setMinimumSize(960, 640)
 
-        self.config_manager = ConfigManager()
+        icon_path = Path(__file__).resolve().parent.parent / "icon" / "logo.jpg"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
+
+        self.config_manager = config_manager or ConfigManager()
+        self._loading_settings = False
         self.api = DanbooruAPI(
             username=self.config_manager.get("api_username", ""),
             api_key=self.config_manager.get("api_key", ""),
@@ -144,6 +150,7 @@ class MainWindow(QMainWindow):
         self.spin_limit.setRange(1, 1000)
         self.spin_limit.setValue(50)
         self.spin_limit.setFixedWidth(80)
+        self.spin_limit.valueChanged.connect(self._save_settings)
         filter_row.addWidget(self.spin_limit)
 
         lbl_order = QLabel("Order:")
@@ -210,19 +217,23 @@ class MainWindow(QMainWindow):
 
         self.cmb_quality = QComboBox()
         self.cmb_quality.addItems(["Original File", "Sample (Large 850px)"])
+        self.cmb_quality.currentIndexChanged.connect(self._save_settings)
         options_row.addWidget(self.cmb_quality)
 
         self.chk_skip = QCheckBox("Skip Existing")
         self.chk_skip.setChecked(True)
+        self.chk_skip.toggled.connect(self._save_settings)
         options_row.addWidget(self.chk_skip)
 
         self.chk_meta = QCheckBox("Save Tags (.txt)")
         self.chk_meta.setChecked(True)
         self.chk_meta.setToolTip("Saves .txt sidecar file with tags for AI LoRA training / Stable Diffusion")
+        self.chk_meta.toggled.connect(self._save_settings)
         options_row.addWidget(self.chk_meta)
 
         self.cmb_meta_fmt = QComboBox()
         self.cmb_meta_fmt.addItems([".txt format", ".json format"])
+        self.cmb_meta_fmt.currentIndexChanged.connect(self._save_settings)
         options_row.addWidget(self.cmb_meta_fmt)
 
         options_row.addStretch()
@@ -350,44 +361,54 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(bottom_box)
 
     def _load_settings(self):
-        download_dir = self.config_manager.get("download_dir", str(Path.cwd() / "downloads"))
-        self.txt_dir.setText(download_dir)
+        self._loading_settings = True
+        try:
+            download_dir = self.config_manager.get("download_dir", str(Path.cwd() / "downloads"))
+            self.txt_dir.setText(download_dir)
 
-        delay = float(self.config_manager.get("request_delay", 1.0))
-        self.slider_delay.setValue(int(delay * 10))
-        self.lbl_delay_val.setText(f"{delay:.1f} s")
+            delay = float(self.config_manager.get("request_delay", 1.0))
+            self.slider_delay.setValue(int(delay * 10))
+            self.lbl_delay_val.setText(f"{delay:.1f} s")
 
-        self.chk_skip.setChecked(self.config_manager.get("skip_existing", True))
-        self.chk_meta.setChecked(self.config_manager.get("save_metadata", True))
+            limit = int(self.config_manager.get("default_limit", 50))
+            self.spin_limit.setValue(max(1, min(1000, limit)))
 
-        fmt = self.config_manager.get("metadata_format", "txt")
-        self.cmb_meta_fmt.setCurrentIndex(0 if fmt == "txt" else 1)
+            self.chk_skip.setChecked(self.config_manager.get("skip_existing", True))
+            self.chk_meta.setChecked(self.config_manager.get("save_metadata", True))
 
-        qual = self.config_manager.get("download_quality", "original")
-        self.cmb_quality.setCurrentIndex(0 if qual == "original" else 1)
+            fmt = self.config_manager.get("metadata_format", "txt")
+            self.cmb_meta_fmt.setCurrentIndex(0 if fmt == "txt" else 1)
 
-        # Ratings
-        ratings = self.config_manager.get("default_ratings", {})
-        self.chk_g.setChecked(ratings.get("g", True))
-        self.chk_s.setChecked(ratings.get("s", True))
-        self.chk_q.setChecked(ratings.get("q", False))
-        self.chk_e.setChecked(ratings.get("e", False))
-        self._update_all_checkbox_state()
+            qual = self.config_manager.get("download_quality", "original")
+            self.cmb_quality.setCurrentIndex(0 if qual == "original" else 1)
 
-        # Auth
-        user = self.config_manager.get("api_username", "")
-        key = self.config_manager.get("api_key", "")
-        if user and key:
-            self.chk_auth.setChecked(True)
-            self.txt_username.setText(user)
-            self.txt_api_key.setText(key)
-            self.txt_username.setEnabled(True)
-            self.txt_api_key.setEnabled(True)
-            self.btn_save_auth.setEnabled(True)
+            # Ratings
+            ratings = self.config_manager.get("default_ratings", {})
+            self.chk_g.setChecked(ratings.get("g", True))
+            self.chk_s.setChecked(ratings.get("s", True))
+            self.chk_q.setChecked(ratings.get("q", False))
+            self.chk_e.setChecked(ratings.get("e", False))
+            self._update_all_checkbox_state()
+
+            # Auth
+            user = self.config_manager.get("api_username", "")
+            key = self.config_manager.get("api_key", "")
+            if user and key:
+                self.chk_auth.setChecked(True)
+                self.txt_username.setText(user)
+                self.txt_api_key.setText(key)
+                self.txt_username.setEnabled(True)
+                self.txt_api_key.setEnabled(True)
+                self.btn_save_auth.setEnabled(True)
+        finally:
+            self._loading_settings = False
 
     def _save_settings(self):
+        if getattr(self, "_loading_settings", False):
+            return
         self.config_manager.set("download_dir", self.txt_dir.text())
         self.config_manager.set("request_delay", self.slider_delay.value() / 10.0)
+        self.config_manager.set("default_limit", self.spin_limit.value())
         self.config_manager.set("skip_existing", self.chk_skip.isChecked())
         self.config_manager.set("save_metadata", self.chk_meta.isChecked())
         self.config_manager.set("metadata_format", "txt" if self.cmb_meta_fmt.currentIndex() == 0 else "json")
@@ -443,7 +464,7 @@ class MainWindow(QMainWindow):
     def _open_dir(self):
         path = self.txt_dir.text()
         if os.path.exists(path):
-            os.startfile(path)
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(path).resolve())))
         else:
             QMessageBox.information(self, "Directory Not Found", f"Directory '{path}' does not exist yet.")
 
@@ -481,6 +502,11 @@ class MainWindow(QMainWindow):
     # --- Fetching Posts ---
     def _start_fetch(self):
         if self.fetch_thread and self.fetch_thread.isRunning():
+            if self.fetch_worker:
+                self.fetch_worker.cancel()
+            self.btn_fetch.setEnabled(False)
+            self.btn_fetch.setText("Stopping...")
+            self.status_pill.setText("Stopping search...")
             return
 
         tags = self.tag_input.text().strip()
@@ -498,7 +524,8 @@ class MainWindow(QMainWindow):
         limit = self.spin_limit.value()
         order_key = self.cmb_order.currentText().split()[0]
 
-        self.btn_fetch.setEnabled(False)
+        self.btn_fetch.setEnabled(True)
+        self.btn_fetch.setText("⏹️ Stop Search")
         self.btn_download.setEnabled(False)
         self.status_pill.setText("Fetching...")
         self.progress_bar.setValue(0)
@@ -525,6 +552,7 @@ class MainWindow(QMainWindow):
     def _on_fetch_finished(self, posts: list):
         self.fetched_posts = posts
         self._populate_table(posts)
+        self.btn_fetch.setText("🔍 Search Posts")
         self.btn_fetch.setEnabled(True)
         self.btn_download.setEnabled(len(posts) > 0)
         self.status_pill.setText(f"Fetched {len(posts)} posts")
@@ -537,6 +565,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(str)
     def _on_fetch_error(self, err_msg: str):
+        self.btn_fetch.setText("🔍 Search Posts")
         self.btn_fetch.setEnabled(True)
         self.status_pill.setText("Error")
         QMessageBox.warning(self, "Fetch Error", f"Failed to fetch posts:\n{err_msg}")
@@ -627,22 +656,36 @@ class MainWindow(QMainWindow):
         row = item.row()
         if 0 <= row < len(self.fetched_posts):
             post = self.fetched_posts[row]
+            post_id = post.get("id")
             menu = QMenu(self)
             menu.setStyleSheet("background-color: #131b2e; color: #f1f5f9; padding: 4px;")
 
             act_browser = QAction("🌐 Open in Danbooru", self)
-            act_browser.triggered.connect(lambda: self.preview_panel._open_in_danbooru())
+            act_browser.triggered.connect(
+                lambda checked=False, pid=post_id: webbrowser.open(f"https://danbooru.donmai.us/posts/{pid}")
+            )
             menu.addAction(act_browser)
 
             act_copy_id = QAction("📋 Copy Post ID", self)
-            act_copy_id.triggered.connect(lambda: self.preview_panel._copy_tags())
+            act_copy_id.triggered.connect(
+                lambda checked=False, pid=post_id: QApplication.clipboard().setText(str(pid))
+            )
             menu.addAction(act_copy_id)
 
-            post_id = post.get("id")
+            act_copy_tags = QAction("🏷️ Copy Tags", self)
+            act_copy_tags.triggered.connect(
+                lambda checked=False, tags=post.get("tag_string", ""): QApplication.clipboard().setText(tags)
+            )
+            menu.addAction(act_copy_tags)
+
             local_path = self.downloaded_paths.get(post_id)
             if local_path and os.path.exists(local_path):
                 act_file = QAction("📁 Open Downloaded File", self)
-                act_file.triggered.connect(lambda: os.startfile(local_path))
+                act_file.triggered.connect(
+                    lambda checked=False, path=local_path: QDesktopServices.openUrl(
+                        QUrl.fromLocalFile(str(Path(path).resolve()))
+                    )
+                )
                 menu.addAction(act_file)
 
             menu.exec(self.table.viewport().mapToGlobal(pos))
@@ -663,6 +706,7 @@ class MainWindow(QMainWindow):
 
         quality = "original" if self.cmb_quality.currentIndex() == 0 else "large"
         meta_fmt = "txt" if self.cmb_meta_fmt.currentIndex() == 0 else "json"
+        naming_fmt = self.config_manager.get("file_naming", "{id}_{md5}.{ext}")
 
         self.download_thread = QThread()
         self.download_worker = DownloadWorker(
@@ -673,6 +717,7 @@ class MainWindow(QMainWindow):
             save_metadata=self.chk_meta.isChecked(),
             metadata_format=meta_fmt,
             quality=quality,
+            naming_format=naming_fmt,
             delay=self.slider_delay.value() / 10.0
         )
         self.download_worker.moveToThread(self.download_thread)
@@ -778,6 +823,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         # Gracefully handle window close
+        if self.fetch_worker:
+            self.fetch_worker.cancel()
         if self.download_worker:
             self.download_worker.cancel()
         if self.download_thread and self.download_thread.isRunning():
